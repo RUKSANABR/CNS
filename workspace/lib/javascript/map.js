@@ -79,11 +79,11 @@ const Maps = {
                             image: new ol.style.Circle({
                                 radius: 10,
                                 fill: new ol.style.Fill({ color: 'rgba(0, 0, 200, 0.2)' }),
-                                stroke: new ol.style.Stroke({ color: 'blue', width: 2 }),
+                                stroke: new ol.style.Stroke({ color: 'blue', width: 5 }),
                             }),
                             text: new ol.style.Text({
                                 textAlign: 'center',
-                                textBaseline: 'middle',
+                                textBaseline: 'bottom',
                                 text: feature.get('name'),
                                 fill: new ol.style.Fill({ color: 'rgba(0, 0, 0, 0.7)' }),
                                 stroke: new ol.style.Stroke({ color: 'rgba(0, 0, 0, 0.7)', width: 1 }),
@@ -104,20 +104,20 @@ const Maps = {
                     style: function (feature, resolution) {
                         return new ol.style.Style({
                             stroke: new ol.style.Stroke({
-                                width: 1,
+                                width: 5,
                                 color: [45, 32, 208, 0.8], //237, 212, 0, 0.8
                             }),
                             text: new ol.style.Text({
                                 placement: 'line',
                                 textBaseline: 'bottom',
-                                text: feature.get('length'),
+                                text: feature.get('name'),
                                 fill: new ol.style.Fill({ color: 'rgba(0, 0, 0, 0.7)' }),
                             })
                         });
                     }
                 });
             }
-            
+
             const iconStyle = new ol.style.Style({
                 image: new ol.style.Icon({
                     anchor: [10, 20],
@@ -143,7 +143,7 @@ const Maps = {
             });
             const mousePositionControl = new ol.control.MousePosition({
                 coordinateFormat: ol.coordinate.createStringXY(4),
-                projection: 'EPSG:4326',//'EPSG:900914',
+                projection: 'EPSG:900913',//'EPSG:900914',
                 // comment the following two lines to have the mouse position
                 // be placed within the map.
                 className: 'custom-mouse-position',
@@ -158,7 +158,8 @@ const Maps = {
                     controls: ol.control.defaults().extend([mousePositionControl]),
                     layers: [raster, vectorLines, vectorPoints, _geotagLayer],
                     target: 'map',
-                    view: view
+                    view: view,
+                    projection: 'EPSG:900913'
                 });
             }
             map.getView().on('change:center', function (evt) {
@@ -167,18 +168,21 @@ const Maps = {
                 _isPanned = true;
             });
         },
-        
-        initPoints: function(coordinate) {// corordinate should be an array with latitude and longitudein its 0th and 1st index.[]
-            let id = commonOps.createID()            
-            var ptFeature = new ol.Feature(new ol.geom.Point(ol.proj.fromLonLat(coordinate)));
-            ptFeature.id = id;
-            ptFeature.name = "Point"+id;
+
+        initPoints: function (coordinate) {// corordinate should be an array with latitude and longitudein its 0th and 1st index.[]
+            let id = commonOps.createID()
+            var ptFeature = new ol.Feature({
+                geometry : new ol.geom.Point(ol.proj.fromLonLat(coordinate)),
+                id : id,
+                name : "Point( " +coordinate+" )"
+                }
+            );
             vectorPoints.getSource().addFeatures([
                 ptFeature
             ]);
-            map.getView().fit(vectorPoints.getSource().getExtent(),{
-                size:map.getSize(),
-                maxZoom:16
+            map.getView().fit(vectorPoints.getSource().getExtent(), {
+                size: map.getSize(),
+                maxZoom: 16
             });
             return {
                 id: id,
@@ -186,25 +190,33 @@ const Maps = {
                 name: 'Point',
                 type: OPERATION.POINT
             };
-    
-        } ,
-        initLine: function(coordinateArray) {
+
+        },
+        initLine: function (coordinateArray) {
             let id = commonOps.createID();
-            let lnFeature = new ol.Feature(new ol.geom.LineString(coordinateArray));
+            var wktLine = commonOps.arrayToWktLineString(coordinateArray)
+            let bline = _wktFormat.readGeometry(wktLine);
+            // let lnFeature = new ol.Feature(new ol.geom.LineString(coordinateArray));
+            let lnFeature = new ol.Feature({
+                geometry: bline,
+                id: id,
+                type: OPERATION.LINE,
+                name:'Line'+id
+            });
             lnFeature.id = id;
-            lnFeature.name ="Line"+id;
+            lnFeature.name = "Line" + id;
             vectorLines.getSource().addFeatures([
                 lnFeature
             ]);
-            map.getView().fit(vectorLines.getSource().getExtent(),{
-                size:map.getSize(),
-                maxZoom:15
+            map.getView().fit(vectorLines.getSource().getExtent(), {
+                size: map.getSize(),
+                maxZoom: 16
             });
-            return{
-                id:id,
-                geometry: coordinateArray,
+            return {
+                id: id,
+                geometry: wktLine,
                 name: 'Line',
-                type:OPERATION.LINE
+                type: OPERATION.LINE
             };
         },
 
@@ -226,7 +238,7 @@ const Maps = {
                             maxZoom: 16
                         });
                     }
-                    
+
                 },
                 function (error) {
                     alert(`ERROR: ${error.message}`);
@@ -237,29 +249,49 @@ const Maps = {
             );
 
         }
-        
+
 
     }
 };
 
-const commonOps={
-    createID:function(){
+const commonOps = {
+    createID: function () {
         return Array(16)
-                .fill(0)
-                .map(() => String.fromCharCode(Math.floor(Math.random() * 26) + 97))
-                .join('') +
-                Date.now().toString(24);
+            .fill(0)
+            .map(() => String.fromCharCode(Math.floor(Math.random() * 26) + 97))
+            .join('') +
+            Date.now().toString(24);
+    },
+    arrayToWktLineString: function (coords) {
+        if (coords.length < 2) {
+            alert("At least two coordinates are required to create a LineString");
+        } else {
+            var coordinates =[]
+            for (let i =0; i < coords.length;i++){
+                coordinates.push(ol.proj.fromLonLat(coords[i]))
+            }
+            let wkt = "LINESTRING (";
+            for (let i = 0; i < coordinates.length; i++) {
+                wkt += coordinates[i][0] + " " + coordinates[i][1];
+                if (i < coordinates.length - 1) {
+                    wkt += ", ";
+                }
+            }
+            wkt += ")";
+            return wkt;
+        }
+
     }
 };
 
 
 (function () {
-   Maps.MapOps.initMaps();
+    Maps.MapOps.initMaps();
 
-   document.getElementById('locateMe').addEventListener("click", function (evt) {
-    Maps.MapOps.initGeotag();
-    _isPanned = false
-});
+    document.getElementById('locateMe').addEventListener("click", function (evt) {
+        Maps.MapOps.initGeotag();
+        _isPanned = false
+    });
 
 
 })();
