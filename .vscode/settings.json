@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 {  
 "liveServer.settings.https":   
 {
@@ -7,4 +8,8 @@
 "passphrase": "admin"  
 },
 "liveServer.settings.port": 5501
+=======
+{
+    "liveServer.settings.port": 5501
+>>>>>>> 5c3f7bdcd834efac59fe48260c86d4fa46c70d32
 }
